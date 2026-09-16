@@ -28,6 +28,12 @@ export class StoreRepository implements IStoreRepository {
     return this.prisma.store.findUnique({ where: { id } });
   }
 
+  async findByIdForTenant(id: string, tenantId: string): Promise<Store | null> {
+    return this.prisma.store.findFirst({
+      where: { id, adminStores: { some: { user: { tenantId } } } },
+    });
+  }
+
   async findBySlug(slug: string): Promise<Store | null> {
     return this.prisma.store.findUnique({ where: { slug } });
   }

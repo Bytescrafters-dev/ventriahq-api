@@ -1,27 +1,51 @@
 import { BillingCycle, Prisma } from '@prisma/client';
 
-export function addBillingCycle(date: Date, cycle: BillingCycle): Date {
+/** Number of calendar months each billing cycle advances. */
+const CYCLE_MONTHS: Record<BillingCycle, number> = {
+  [BillingCycle.MONTHLY]: 1,
+  [BillingCycle.QUARTERLY]: 3,
+  [BillingCycle.SEMI_ANNUAL]: 6,
+  [BillingCycle.ANNUAL]: 12,
+};
+
+/** Last day of the UTC month that `d` falls in. */
+function daysInUtcMonth(d: Date): number {
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+}
+
+/**
+ * Adds whole months, clamping to the last day of the target month rather than
+ * overflowing into the next one. Naively calling setUTCMonth on a month-end
+ * date overflows — Jan 31 + 1 month becomes "Feb 31", which normalises to
+ * Mar 3 — and because renewals chain off the previous period end, that would
+ * permanently move a tenant's billing anchor off the 31st.
+ */
+function addUtcMonthsClamped(date: Date, months: number): Date {
   const d = new Date(date);
-  switch (cycle) {
-    case BillingCycle.MONTHLY:
-      d.setMonth(d.getMonth() + 1);
-      break;
-    case BillingCycle.QUARTERLY:
-      d.setMonth(d.getMonth() + 3);
-      break;
-    case BillingCycle.SEMI_ANNUAL:
-      d.setMonth(d.getMonth() + 6);
-      break;
-    case BillingCycle.ANNUAL:
-      d.setFullYear(d.getFullYear() + 1);
-      break;
-  }
+  const day = d.getUTCDate();
+  // Park on the 1st first so the month shift itself can never overflow.
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(Math.min(day, daysInUtcMonth(d)));
   return d;
+}
+
+export function addBillingCycle(date: Date, cycle: BillingCycle): Date {
+  const months = CYCLE_MONTHS[cycle];
+  // Unreachable for a mapped cycle — CYCLE_MONTHS is exhaustive over the enum
+  // at compile time — but a value arriving from outside TypeScript must not
+  // silently yield a zero-length billing period.
+  if (months === undefined) {
+    throw new Error(`Unhandled billing cycle: ${String(cycle)}`);
+  }
+  return addUtcMonthsClamped(date, months);
 }
 
 export function calcDueDate(periodEnd: Date, daysUntilDue: number): Date {
   const d = new Date(periodEnd);
-  d.setDate(d.getDate() + daysUntilDue);
+  d.setUTCDate(d.getUTCDate() + daysUntilDue);
   return d;
 }
 

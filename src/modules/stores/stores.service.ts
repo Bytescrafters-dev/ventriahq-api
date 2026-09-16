@@ -26,8 +26,26 @@ export class StoresService {
     return this.storeRepo.createWithOwner(storeData, ownerId);
   }
 
-  async getStoreById(id: string): Promise<Store | null> {
-    return this.storeRepo.findById(id);
+  /**
+   * Resolves a store the caller's tenant owns, or throws.
+   *
+   * Throws NotFound rather than Forbidden on a store owned by someone else:
+   * a Forbidden would confirm the id exists, letting a caller enumerate other
+   * tenants' stores. A caller with no tenant owns no stores.
+   */
+  private async findOwnedStore(
+    id: string,
+    tenantId: string | null,
+  ): Promise<Store> {
+    const store = tenantId
+      ? await this.storeRepo.findByIdForTenant(id, tenantId)
+      : null;
+    if (!store) throw new NotFoundException('Store not found');
+    return store;
+  }
+
+  async getStoreById(id: string, tenantId: string | null): Promise<Store> {
+    return this.findOwnedStore(id, tenantId);
   }
 
   async getStoreBySlug(slug: string): Promise<Store | null> {
@@ -38,20 +56,17 @@ export class StoresService {
     return this.adminStoreRepo.findStoresByUserId(id);
   }
 
-  async updateStore(id: string, data: UpdateStoreDto): Promise<Store> {
-    // const updateData = {
-    //   ...data,
-    //   ...(data.domain !== undefined && { domain: data.domain ?? null }),
-    //   ...(data.timezone !== undefined && { timezone: data.timezone ?? null }),
-    //   ...(data.supportEmail !== undefined && {
-    //     supportEmail: data.supportEmail ?? null,
-    //   }),
-    //   ...(data.logoUrl !== undefined && { logoUrl: data.logoUrl ?? null }),
-    // };
+  async updateStore(
+    id: string,
+    data: UpdateStoreDto,
+    tenantId: string | null,
+  ): Promise<Store> {
+    await this.findOwnedStore(id, tenantId);
     return this.storeRepo.updateById(id, data);
   }
 
-  async deleteStore(id: string): Promise<void> {
+  async deleteStore(id: string, tenantId: string | null): Promise<void> {
+    await this.findOwnedStore(id, tenantId);
     return this.storeRepo.deleteById(id);
   }
 }

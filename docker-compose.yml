@@ -10,6 +10,22 @@ services:
     ports: ['5432:5432']
     volumes: [dbdata:/var/lib/postgresql/data]
 
+  # Integration-test database. Separate port and an ephemeral tmpfs volume, so
+  # it can never touch dev data and starts clean on every `docker compose up`.
+  db-test:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ventriahq_test
+    ports: ['5433:5432']
+    tmpfs: ['/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ventriahq_test']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
   redis:
     image: redis:7
     ports: ['6379:6379']

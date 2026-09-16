@@ -16,6 +16,10 @@ import { UpdateStoreDto } from './dtos/update-store.dto';
 import { Roles, RolesGuard } from 'src/common/auth';
 import { AdminRole } from '@prisma/client';
 
+interface AuthedRequest {
+  user: { sub: string; tenantId: string | null };
+}
+
 @Controller('stores')
 @UseGuards(AdminGuard)
 export class StoresController {
@@ -24,27 +28,35 @@ export class StoresController {
   @UseGuards(RolesGuard)
   @Roles(AdminRole.OWNER)
   @Post()
-  createStore(@Body() data: CreateStoreDto, @Req() req: any) {
+  createStore(@Body() data: CreateStoreDto, @Req() req: AuthedRequest) {
     return this.storesService.createStore(data, req.user.sub);
   }
 
   @Get()
-  getAllStores(@Req() req: any) {
-    return this.storesService.getAllStores(req.user?.sub);
+  getAllStores(@Req() req: AuthedRequest) {
+    return this.storesService.getAllStores(req.user.sub);
   }
 
   @Get(':id')
-  getStoreById(@Param('id') id: string) {
-    return this.storesService.getStoreById(id);
+  getStoreById(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.storesService.getStoreById(id, req.user.tenantId);
   }
 
   @Patch(':id')
-  updateStore(@Param('id') id: string, @Body() data: UpdateStoreDto) {
-    return this.storesService.updateStore(id, data);
+  @UseGuards(RolesGuard)
+  @Roles(AdminRole.OWNER, AdminRole.MANAGER)
+  updateStore(
+    @Param('id') id: string,
+    @Body() data: UpdateStoreDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.storesService.updateStore(id, data, req.user.tenantId);
   }
 
   @Delete(':id')
-  deleteStore(@Param('id') id: string) {
-    return this.storesService.deleteStore(id);
+  @UseGuards(RolesGuard)
+  @Roles(AdminRole.OWNER)
+  deleteStore(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.storesService.deleteStore(id, req.user.tenantId);
   }
 }
