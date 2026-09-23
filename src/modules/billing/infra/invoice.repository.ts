@@ -43,6 +43,8 @@ export class InvoiceRepository implements IInvoiceRepository {
             firstName: true,
             lastName: true,
             companyName: true,
+            phone: true,
+            email: true,
           },
         },
         subscription: SUBSCRIPTION_SELECT,
@@ -60,13 +62,19 @@ export class InvoiceRepository implements IInvoiceRepository {
 
   private buildWhere(params: Omit<InvoicesListParams, 'skip' | 'take'>) {
     const { status, q, createdAtFrom, createdAtTo, dueFrom, dueTo } = params;
+    const like = { contains: q, mode: 'insensitive' as const };
     return {
       ...(status ? { status } : {}),
       ...(q
         ? {
             OR: [
-              { invoiceNumber: { contains: q, mode: 'insensitive' as const } },
-              { notes: { contains: q, mode: 'insensitive' as const } },
+              { invoiceNumber: like },
+              { notes: like },
+              { tenant: { companyName: like } },
+              { tenant: { firstName: like } },
+              { tenant: { lastName: like } },
+              { tenant: { phone: like } },
+              { tenant: { email: like } },
             ],
           }
         : {}),

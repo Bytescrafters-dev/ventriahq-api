@@ -28,10 +28,6 @@ export class InvoicesQueryDto {
 
   @IsOptional()
   @IsString()
-  currentPlanName?: string;
-
-  @IsOptional()
-  @IsString()
   q?: string;
 
   @IsOptional()
